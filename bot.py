@@ -12,7 +12,7 @@ from aiogram.types import Message
 TOKEN = os.getenv("BOT_TOKEN")
 
 # KINOLARNI QO'SHA OLADIGAN 2 TA ADMINNING TELEGRAM ID'SI
-ADMIN_IDS = [123456789, 987654321]  # <--- O'zingizning ID raqamlaringizni yozing!
+ADMIN_IDS = [9050771937, 7617900973]  # <--- O'zingizning ID raqamlaringizni yozing!
 
 MOVIES_DB = {}
 

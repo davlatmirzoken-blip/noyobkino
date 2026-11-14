@@ -32,7 +32,6 @@ def db_start():
             caption TEXT
         )
     """)
-    # Agar jadval oldindan mavjud bo'lib, caption ustuni bo'lmasa xato bermasligi uchun
     try:
         cursor.execute("ALTER TABLE movies ADD COLUMN caption TEXT")
     except sqlite3.OperationalError:
@@ -74,13 +73,13 @@ class AddMovieState(StatesGroup):
 # --- 3. BOT BUYRUQLARI ---
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message):
+    # Emodjilar o'rniga ularning Unicode kodlari ishlatildi (Render xato bermasligi uchun)
     await message.answer(
-        "        "🎬 **Xush kelibsiz!** ✨\n\n"
-        "🍿 *Eng sara va qiziqarli kinolar olamiga marhamat! Bizning bot orqali sevimli filmlaringizni bir soniyada topib olishingiz mumkin.*\n\n"
-        "🔍 **Qanday foydalaniladi?**\n"
-        "👉 Shunchaki kinoning maxsus **raqamli kodini** yuboring (masalan: `101` yoki `777`).\n\n"
-        "⚡️ *Tezkor, qulay va reklamasiz! Maroqli hordiq tilaymiz!* 🎥🍿"
-    )"
+        "\U0001F3AC **Xush kelibsiz!** \u2728\n\n"
+        "\U0001F37F *Eng sara va qiziqarli kinolar olamiga marhamat! Bizning bot orqali sevimli filmlaringizni bir soniyada topib olishingiz mumkin.*\n\n"
+        "\U0001F50D **Qanday foydalaniladi?**\n"
+        "\U0001F449 Shunchaki kinoning maxsus **raqamli kodini** yuboring (masalan: `101` yoki `777`).\n\n"
+        "\u26A1\uFE0F *Tezkor, qulay va reklamasiz! Maroqli hordiq tilaymiz!* \U0001F3A5\U0001F37F"
     )
 
 # Admin uchun kino qo'shish buyrug'i: /add 101
@@ -115,7 +114,6 @@ async def save_movie_file(message: types.Message, state: FSMContext):
         await message.answer("⚠️ Iltimos, video yoki hujjat (file) ko'rinishida yuboring!")
         return
 
-    # Admin video bilan birga yozgan matnni (tavsifni) olamiz
     caption = message.caption if message.caption else ""
 
     success = add_movie(movie_code, file_id, caption)
@@ -133,7 +131,6 @@ async def get_movie_handler(message: types.Message):
     file_id, caption = get_movie(code)
 
     if file_id:
-        # Agar admin tavsif yozgan bo'lsa o'shani chiqaramiz, bo'lmasa oddiy kodni yozamiz
         final_caption = caption if caption else f"🎬 Kino kodi: `{code}`"
 
         await message.answer_video(

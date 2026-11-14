@@ -11,7 +11,7 @@ from aiohttp import web
 # Token va Admin ID ni Render muhit o'zgaruvchilaridan (Environment Variables) o'qiymiz
 TOKEN = os.getenv("BOT_TOKEN")
 # O'zingizning Telegram ID raqamingizni shu yerga yozing (masalan: 123456789)
-ADMIN_ID = int(os.getenv("ADMIN_ID", "7617900973"))
+ADMIN_ID = 7617900973
 
 if not TOKEN:
     raise ValueError("Xatolik: BOT_TOKEN muhit o'zgaruvchisi topilmadi!")

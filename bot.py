@@ -8,10 +8,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiohttp import web
 
-# Token va Admin ID ni Render muhit o'zgaruvchilaridan (Environment Variables) o'qiymiz
+# Token Render muhit o'zgaruvchilaridan (Environment Variables) o'qiladi
 TOKEN = os.getenv("BOT_TOKEN")
-# O'zingizning Telegram ID raqamingizni shu yerga yozing (masalan: 123456789)
-ADMIN_ID = 7617900973
+
+# O'zingizning Telegramdagi ID raqamingizni shu yerga yozasiz:
+ADMIN_ID = 7617900973  # <--- Shu yerga o'z ID raqamingizni yozing
 
 if not TOKEN:
     raise ValueError("Xatolik: BOT_TOKEN muhit o'zgaruvchisi topilmadi!")
@@ -27,17 +28,27 @@ def db_start():
         CREATE TABLE IF NOT EXISTS movies (
             id INTEGER PRIMARY KEY,
             movie_code TEXT UNIQUE,
-            file_id TEXT
+            file_id TEXT,
+            caption TEXT
         )
     """)
+    # Agar jadval oldindan mavjud bo'lib, caption ustuni bo'lmasa xato bermasligi uchun
+    try:
+        cursor.execute("ALTER TABLE movies ADD COLUMN caption TEXT")
+    except sqlite3.OperationalError:
+        pass
+        
     conn.commit()
     conn.close()
 
-def add_movie(code, file_id):
+def add_movie(code, file_id, caption):
     conn = sqlite3.connect("movies.db")
     cursor = conn.cursor()
     try:
-        cursor.execute("INSERT OR REPLACE INTO movies (movie_code, file_id) VALUES (?, ?)", (code, file_id))
+        cursor.execute(
+            "INSERT OR REPLACE INTO movies (movie_code, file_id, caption) VALUES (?, ?, ?)", 
+            (code, file_id, caption)
+        )
         conn.commit()
         return True
     except Exception as e:
@@ -49,10 +60,10 @@ def add_movie(code, file_id):
 def get_movie(code):
     conn = sqlite3.connect("movies.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT file_id FROM movies WHERE movie_code = ?", (code,))
+    cursor.execute("SELECT file_id, caption FROM movies WHERE movie_code = ?", (code,))
     movie = cursor.fetchone()
     conn.close()
-    return movie[0] if movie else None
+    return movie if movie else (None, None)
 
 
 # --- 2. FSM (Kino qo'shish holati) ---
@@ -64,14 +75,19 @@ class AddMovieState(StatesGroup):
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message):
     await message.answer(
-        "👋 Salom men noyob kinolarni sizga taqdim etuvchi botman menga kod yuboring va hech qanday majburiy kanallarsiz kinoni maroqli tomoasha qiling marhamat "
+        "        "🎬 **Xush kelibsiz!** ✨\n\n"
+        "🍿 *Eng sara va qiziqarli kinolar olamiga marhamat! Bizning bot orqali sevimli filmlaringizni bir soniyada topib olishingiz mumkin.*\n\n"
+        "🔍 **Qanday foydalaniladi?**\n"
+        "👉 Shunchaki kinoning maxsus **raqamli kodini** yuboring (masalan: `101` yoki `777`).\n\n"
+        "⚡️ *Tezkor, qulay va reklamasiz! Maroqli hordiq tilaymiz!* 🎥🍿"
+    )"
     )
 
 # Admin uchun kino qo'shish buyrug'i: /add 101
 @dp.message(Command("add"))
 async def add_cmd(message: types.Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID:
-        await message.answer("❌ Kechirasiz, bu buyruqfaqat admin uchun.")
+        await message.answer("❌ Kechirasiz, bu buyruq faqat admin uchun.")
         return
 
     args = message.text.split(maxsplit=1)
@@ -82,10 +98,10 @@ async def add_cmd(message: types.Message, state: FSMContext):
     movie_code = args[1].strip()
     
     await state.update_data(movie_code=movie_code)
-    await message.answer(f"📥 `{movie_code}` raqami uchun **kino (video yoki hujjat)** yuboring:")
+    await message.answer(f"📥 `{movie_code}` raqami uchun **kinoni va uning tavsifini (caption)** birga yuboring:")
     await state.set_state(AddMovieState.waiting_for_file)
 
-# Admin yuborgan videoni bazaga saqlash
+# Admin yuborgan video va uning tavsifini bazaga saqlash
 @dp.message(AddMovieState.waiting_for_file, F.from_user.id == ADMIN_ID)
 async def save_movie_file(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -99,7 +115,10 @@ async def save_movie_file(message: types.Message, state: FSMContext):
         await message.answer("⚠️ Iltimos, video yoki hujjat (file) ko'rinishida yuboring!")
         return
 
-    success = add_movie(movie_code, file_id)
+    # Admin video bilan birga yozgan matnni (tavsifni) olamiz
+    caption = message.caption if message.caption else ""
+
+    success = add_movie(movie_code, file_id, caption)
     if success:
         await message.answer(f"✅ Muvaffaqiyatli saqlandi!\nKodi: `{movie_code}`")
     else:
@@ -107,16 +126,19 @@ async def save_movie_file(message: types.Message, state: FSMContext):
 
     await state.clear()
 
-# Foydalanuvchi kod yuborganda kinoni chiqarish
+# Foydalanuvchi kod yuborganda kinoni va uning tavsifini chiqarish
 @dp.message(F.text)
 async def get_movie_handler(message: types.Message):
     code = message.text.strip()
-    file_id = get_movie(code)
+    file_id, caption = get_movie(code)
 
     if file_id:
+        # Agar admin tavsif yozgan bo'lsa o'shani chiqaramiz, bo'lmasa oddiy kodni yozamiz
+        final_caption = caption if caption else f"🎬 Kino kodi: `{code}`"
+
         await message.answer_video(
             video=file_id, 
-            caption=f"🎬 Siz so'ragan kino!\n🔢 Kodi: `{code}`"
+            caption=final_caption
         )
     else:
         await message.answer("🔍 Bunday kodli kino topilmadi. Iltimos, to'g'ri kod yuboring.")
@@ -132,7 +154,6 @@ async def web_server():
     runner = web.AppRunner(app)
     await runner.setup()
     
-    # Render taqdim etadigan PORT ni olamiz (default 10000)
     port = int(os.environ.get("PORT", 10000))
     site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
@@ -144,7 +165,6 @@ async def main():
     logging.basicConfig(level=logging.INFO)
     print("Bot va veb-server ishga tushdi...")
     
-    # Ham bot polling, ham veb-serverni bir vaqtda ishlatamiz
     await asyncio.gather(
         web_server(),
         dp.start_polling(bot)
